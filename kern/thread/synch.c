@@ -35,6 +35,7 @@
 #include <types.h>
 #include <lib.h>
 #include <spinlock.h>
+#include <spl.h>
 #include <wchan.h>
 #include <thread.h>
 #include <current.h>
@@ -154,9 +155,19 @@ lock_create(const char *name)
 		return NULL;
 	}
 
+
+        lock->lock_wchan = wchan_create(sem->sem_name);
+        if (lock->lock_wchan == NULL) {
+                kfree(lock->sem_name);
+                kfree(lock);
+                return NULL;
+        }
+
 	HANGMAN_LOCKABLEINIT(&lock->lk_hangman, lock->lk_name);
 
 	// add stuff here as needed
+	lock->held = 0;
+	lock->holder = NULL;
 
 	return lock;
 }
@@ -169,21 +180,33 @@ lock_destroy(struct lock *lock)
 	// add stuff here as needed
 
 	kfree(lock->lk_name);
+	wchan_destroy(lock->lk_wchan);
 	kfree(lock);
 }
 
 void
 lock_acquire(struct lock *lock)
 {
+	KASSERT(lock != NULL);
+	KASSERT(curthread->t_in_interrupt == 0);
+	
+	int spl = splhigh();
+	KASSERT(!(lock->holder == curthread))
+	HANGMAN_WAIT(&curthread->t_hangman,&lock->lk_hangman);
+	while (lock->held){
+		wchan_sleep(lock->lock_wchan,&lock->lk_lock);
+	}
 	/* Call this (atomically) before waiting for a lock */
 	//HANGMAN_WAIT(&curthread->t_hangman, &lock->lk_hangman);
 
 	// Write this
 
-	(void)lock;  // suppress warning until code gets written
+  // suppress warning until code gets written
 
-	/* Call this (atomically) once the lock is acquired */
-	//HANGMAN_ACQUIRE(&curthread->t_hangman, &lock->lk_hangman);
+	lock->holder = curthread;
+	lock->held = 1;
+	HANGMAN_ACQUIRE(&curthread->t_hangman, &lock->lk_hangman);
+	splx(spl);
 }
 
 void
