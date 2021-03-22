@@ -680,6 +680,7 @@ cvtest2(int nargs, char **args)
 		testlocks[i] = lock_create("cvtest2 lock");
 		testcvs[i] = cv_create("cvtest2 cv");
 	}
+
 	spinlock_init(&status_lock);
 	test_status = TEST161_SUCCESS;
 
@@ -693,6 +694,7 @@ cvtest2(int nargs, char **args)
 	}
 	P(exitsem);
 	P(exitsem);
+
 
 	sem_destroy(exitsem);
 	sem_destroy(gatesem);
